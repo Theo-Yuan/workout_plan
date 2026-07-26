@@ -1,0 +1,11 @@
+# 环境变量（包含 API Key）
+.env
+
+# 自动生成的 auth 片段（包含真实 API Key）
+.agents/skills/_shared/auth.*.md
+
+# 本地训练数据库
+.agents/db/train.db
+
+# 个人训练档案（含身体数据、训练偏好）
+.agents/profile.md
