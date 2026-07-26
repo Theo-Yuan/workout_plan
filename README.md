@@ -90,11 +90,18 @@ Agent 会自动读取 `.agents/profile.md` 了解你的偏好和目标。
     │   ├── auth.diet.md              ← 饮食 Key（生成，已 gitignore）
     │   ├── auth.train.md             ← 训练 Key（生成，已 gitignore）
     │   ├── error-handling.md         ← 通用错误处理
-    │   ├── generate_auth.py          ← Key 注入脚本
-    │   └── training-knowledge.md     ← 训练科学知识库
+    │   └── generate_auth.py          ← Key 注入脚本
     ├── body.md                ← 训记身体数据 API Skill
     ├── diet.md                ← 训记饮食数据 API Skill
     └── train.md               ← 训记训练数据 API Skill
+├── knowledge/
+│   ├── 00-快速导航.md             ← 知识库入口
+│   ├── 01-训练核心原则.md           ← 容量/强度/频率/渐进
+│   ├── 02-计划设计.md             ← 分化/周期化/PPL模板
+│   ├── 03-动作技术.md             ← 动作要点/替代方案
+│   ├── 04-恢复与伤病.md           ← 恢复评估/伤病预防
+│   ├── 05-营养与补剂.md           ← 饮食/补剂选择
+│   └── 99-来源文献.md             ← 来源链接（可追溯验证）
 
 .env                          ← API Key（已 gitignore）
 .env.example                  ← Key 模板

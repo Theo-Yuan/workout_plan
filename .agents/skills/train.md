@@ -13,9 +13,8 @@ description: "训记训练数据 Open API —— 读取/写回训练记录、RPE
 
 @_shared/auth.train.md
 
-@_shared/training-knowledge.md
-
-> **用户画像**: 另见 `.agents/profile.md`（非 skill，agent 需用 Read 工具单独加载）
+> **训练知识库**: 另见 `.agents/knowledge/00-快速导航.md`（Agent 需用 Read 工具加载）
+> **用户画像**: 另见 `.agents/profile.md`（Agent 需用 Read 工具单独加载）
 
 ## 接口
 - 训练记录 Base URL: `https://trains.xunjiapp.cn`
