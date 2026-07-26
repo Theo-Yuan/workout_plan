@@ -5,50 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>训记训练知识库</title>
   <style>
-    /* 移动端优化：侧边栏宽度、字体大小 */
-    :root {
-      --sidebar-width: 18rem;
-      --content-max-width: 48rem;
-      --theme-color: #e67e22;
-    }
-    /* 知识库内容图片/表格在手机上自适应 */
+    :root { --sidebar-width: 18rem; --content-max-width: 48rem; --theme-color: #e67e22; }
     table { display: block; overflow-x: auto; white-space: nowrap; }
   </style>
-  <!-- Docsify 核心 -->
   <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
 </head>
 <body>
   <div id="app"></div>
-
   <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
   <script>
     window.$docsify = {
       name: '🏋️ 训记训练知识库',
       repo: 'https://github.com/Theo-Yuan/workout_plan',
-      basePath: '/',
+      basePath: '/workout_plan/',
       relativePath: true,
       loadSidebar: true,
-      loadNavbar: false,
       subMaxLevel: 3,
-      search: {
-        paths: 'auto',
-        placeholder: '搜索知识库...',
-        noData: '未找到结果'
-      },
+      search: { paths: 'auto', placeholder: '搜索知识库...', noData: '未找到结果' },
       homepage: 'README.md',
-      /* 自动折叠侧边栏 */
-      autoHeader: true,
-      executeScript: true,
-      /* 移动端适配 */
-      mobile: {
-        sidebarWidth: '80vw'
-      }
     };
   </script>
-  <!-- 搜索插件 -->
   <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
-  <!-- 代码高亮 -->
-  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
-  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
 </body>
 </html>
