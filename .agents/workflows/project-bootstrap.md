@@ -18,32 +18,31 @@ updated: 2026-07-26
 ├── profile.md            ← 用户画像（gitignored）
 ├── profile.example.md    ← 画像模板
 ├── db/                   ← 数据管道
-│   ├── sync.py           ←   数据拉取脚本
-│   ├── analyze.py        ←   数据分析脚本
+│   ├── sync.py           ←   批量历史同步脚本
+│   ├── query.py          ←   单日/范围查询（cache-through）
+│   ├── write.py          ←   写回（dry-run → confirmed）
 │   └── data.db           ←   SQLite 数据库（gitignored）
 ├── skills/               ← Agent Skill
 │   ├── domain.md         ←   领域 API Skill（主 skill）
 │   └── _shared/          ←   共享模块
 │       ├── auth.md
 │       ├── error-handling.md
-│       ├── generate_auth.py
-│       └── project-bootstrap.md  ← 本文档的 skill 版
-├── knowledge/            ← 知识库
-│   ├── 00-快速导航.md     ←   人类入口 + Agent 索引
-│   ├── 01-主题.md         ←   每章一个文件，frontmatter + 叙述体
-│   ├── 99-来源文献.md     ←   所有来源链接
-│   └── WORKFLOW.md       ←   知识库维护协议
+│       └── generate_auth.py
 └── workflows/            ← 可复用工作流
     └── project-bootstrap.md  ← 本文档
 
-.env                      ← API Key（gitignored）
-.env.example              ← Key 模板
+knowledge/                ← 项目知识库（根目录，项目内容）
+├── 00-快速导航.md         ←   人类入口 + Agent 索引
+├── 01-主题.md             ←   每章一个文件，frontmatter + 叙述体
+├── 99-来源文献.md         ←   所有来源链接
+└── WORKFLOW.md           ←   知识库维护协议
+
+tmp/                      ← 临时文件（截图、缓存等，已 gitignore）
+.env / .env.example       ← API Key / 模板
 .gitignore
 README.md                 ← 项目入口
-index.html                ← Docsify（GitHub Pages）
-_sidebar.md               ← Docsify 侧边栏
+index.html / _sidebar.md  ← Docsify（GitHub Pages）
 .nojekyll                 ← 禁用 Jekyll
-404.html                  ← SPA 兜底
 ```
 
 ---
@@ -53,7 +52,8 @@ _sidebar.md               ← Docsify 侧边栏
 ### 1.1 创建目录骨架
 
 ```
-mkdir -p .agents/{db,skills/_shared,knowledge/_inbox,workflows}
+mkdir -p .agents/{db,skills/_shared,workflows}
+mkdir -p knowledge/_inbox tmp
 touch .gitignore .env.example README.md
 ```
 
@@ -71,6 +71,10 @@ touch .gitignore .env.example README.md
 
 # 个人画像
 .agents/profile.md
+
+# 临时文件
+tmp/
+*.png *.jpg *.jpeg
 ```
 
 ### 1.3 配置 `.env.example`
@@ -187,7 +191,13 @@ with open(Path(__file__).parent / "auth.domain.md", "w") as f:
 ### 4.1 设计数据库 Schema
 
 ```sql
--- SQLite 标准模式
+-- 同步元数据：记录已同步日期（含空日），防缓存穿透
+CREATE TABLE IF NOT EXISTS sync_meta (
+    key TEXT PRIMARY KEY,  -- "synced_2026-01-01"
+    value TEXT
+);
+
+-- 数据主表
 CREATE TABLE IF NOT EXISTS records (
     id INTEGER PRIMARY KEY,
     date TEXT NOT NULL,
@@ -197,28 +207,45 @@ CREATE TABLE IF NOT EXISTS records (
 CREATE INDEX IF NOT EXISTS idx_records_date ON records(date);
 ```
 
-### 4.2 编写同步脚本 `sync.py`
+### 4.2 编写 CRUD 脚本
 
-关键模式：
-- 增量同步（记录已同步的日期，跳过重复）
-- 限频控制（sleep API 要求的间隔）
-- 写入 SQLite
+数据管道脚本只封装纯增删改查，不包含分析逻辑。分析由 Agent 在 SQLite 上直接推理。
 
-### 4.3 编写分析脚本 `analyze.py`
+| 操作 | 脚本 | 职责 |
+|------|------|------|
+| **C**reate | `write.py --confirmed` | API 写入 + 自动同步到本地缓存 |
+| **R**ead | `query.py --date YYYY-MM-DD` | cache-through：本地 → API → 回写缓存 |
+| **U**pdate | `write.py --confirmed` | API 同 upsert 接口 |
+| **Bulk** | `sync.py --months N` | 批量历史同步 |
 
-输出模式：
-- 概览（总量、频率、趋势）
-- 分类分布
-- 主项进展
-- 异常/平台期检测
-- 个性化建议
+#### `query.py` — cache-through 读
 
-支持参数：
-```bash
-python .agents/db/analyze.py                # 完整报告
-python .agents/db/analyze.py --advice       # 仅建议
-python .agents/db/analyze.py --detail "xxx" # 单项分析
 ```
+python .agents/db/query.py --date 2026-07-27         # 单日
+python .agents/db/query.py --range 2026-07-01 2026-07-27  # 范围
+python .agents/db/query.py --date 2026-07-27 --json   # JSON 输出
+python .agents/db/query.py --check 2026-07-27         # 仅查本地缓存
+```
+
+核心行为：
+- 优先查本地 SQLite
+- 未命中 → 调 API → 写回缓存 → 返回
+- 空日期也标记为 `sync_meta.synced_{date}`，**防缓存穿透**
+- `--force-api` 跳过缓存直调 API
+
+#### `write.py` — 写回
+
+```
+cat data.json | python .agents/db/write.py --dry-run      # 验证
+cat data.json | python .agents/db/write.py --confirmed    # 确认写入
+```
+
+- dry-run 只展示摘要，不调 API
+- `--confirmed` 才真正写入，写完后自动 `query.py --force-api` 同步受影响日期
+
+#### `sync.py` — 批量同步
+
+同步模式和限频控制，参考训记项目的 `sync_train.py`。
 
 ---
 
@@ -357,6 +384,13 @@ EOF
 > **用户画像**: 另见 `.agents/profile.md`
 ```
 
+分析由 Agent 直接在本地 SQLite 上推理（不依赖固定规则脚本）：
+
+```
+python .agents/db/sync.py --months 6      # 先同步数据
+sqlite3 .agents/db/data.db "SELECT ..."   # Agent 直接做 SQL 查询
+```
+
 Agent 调用流程：
 
 ```
@@ -365,7 +399,7 @@ Agent 调用流程：
         → 用 Read 工具加载 00-快速导航.md
         → 判断需要哪个知识文件
         → 按需加载具体文件
-        → 结合 profile 和数据库数据输出
+        → 结合 profile + sqlite3 查询数据输出
 ```
 
 ---
