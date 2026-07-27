@@ -11,12 +11,11 @@ TODAY = date.today().isoformat()
 TARGET = "学习星球/健身打卡"
 
 
-def query_today() -> list:
-    result = subprocess.run(
-        ["python3", ".agents/db/query_train.py", "--date", TODAY,
-         "--json", "--force-api"],
-        capture_output=True, text=True
-    )
+def query_date(date_str: str) -> list:
+    args = ["python3", ".agents/db/query_train.py", "--date", date_str, "--json"]
+    if date_str >= TODAY:
+        args.append("--force-api")
+    result = subprocess.run(args, capture_output=True, text=True)
     if result.returncode != 0:
         print(result.stderr, file=sys.stderr)
         sys.exit(1)
@@ -127,7 +126,7 @@ def send_discord(message: str, target: str = TARGET):
 
 
 def main():
-    data = query_today()
+    data = query_date(TODAY)
     if not data:
         print(f"No training data for {TODAY}")
         return
