@@ -155,16 +155,4 @@ echo "消息内容" | python3 .agents/sched/send_discord.py "学习星球/健身
 
 ```bash
 ./.agents/sched/workout_preview.sh
-```
-
-### 调度建议
-
-可将脚本加入 crontab 实现自动化：
-
-```bash
-# 每天早上 7:00 发送训练预告
-0 7 * * * /path/to/.agents/sched/workout_preview.sh
-
-# 每天晚上 22:00 检查并发送训练总结
-0 22 * * * /path/to/.agents/sched/workout_summary.sh
 ``` |
