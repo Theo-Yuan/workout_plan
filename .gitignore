@@ -12,3 +12,9 @@
 
 # 临时文件（截图、缓存等）
 tmp/
+*.png
+*.jpg
+*.jpeg
+
+# Playwright MCP 产物
+.playwright-mcp/
