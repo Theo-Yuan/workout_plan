@@ -318,8 +318,8 @@ _inbox/  分类    来源     更新    按需
 ```markdown
 - [🏠 首页](README.md)
 - **知识库**
-  - [📖 快速导航](.agents/knowledge/00-快速导航.md)
-  - [📖 章节](.agents/knowledge/01-xxx.md)
+  - [📖 快速导航](knowledge/00-快速导航.md)
+  - [📖 章节](knowledge/01-xxx.md)
 ```
 
 ### 6.3 配置 GitHub Pages
@@ -344,7 +344,7 @@ EOF
 
 - **不要用 `relativePath: true`**——会导致侧边栏链接路径重复拼接
 - `.nojekyll` 必须在项目根目录，确保 dotfile 和 `_sidebar.md` 被正常服务
-- 根目录模式让 Docsify 直接引用 `.agents/knowledge/` 的原始文件，单一数据源
+- 根目录模式让 Docsify 直接引用 `knowledge/` 的原始文件，单一数据源
 
 ---
 
@@ -353,7 +353,7 @@ EOF
 ### 主 Skill 中引用知识库和画像
 
 ```markdown
-> **知识库**: 另见 `.agents/knowledge/00-快速导航.md`
+> **知识库**: 另见 `knowledge/00-快速导航.md`
 > **用户画像**: 另见 `.agents/profile.md`
 ```
 

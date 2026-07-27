@@ -46,17 +46,23 @@ python .agents/db/sync_train.py --status
 python .agents/db/sync_train.py --months 1
 ```
 
-### 3. 分析训练
+### 3. CRUD 操作（CLI 脚本）
 
 ```bash
-# 完整分析报告
-python .agents/db/analyze.py
+# 查询某天训练（自动处理：本地缓存 → API → 回写缓存）
+python .agents/db/query_train.py --date 2026-07-27
 
-# 查看某个动作的进展
-python .agents/db/analyze.py --movement "杠铃卧推"
+# 批量查询日期范围
+python .agents/db/query_train.py --range 2026-07-01 2026-07-27
 
-# 快速训练建议
-python .agents/db/analyze.py --advice
+# JSON 格式输出（供 Agent 消费）
+python .agents/db/query_train.py --date 2026-07-27 --json
+
+# 写回训练（先 dry-run 验证）
+cat training.json | python .agents/db/write_train.py --dry-run
+
+# 确认写入（自动同步到本地缓存）
+cat training.json | python .agents/db/write_train.py --confirmed
 ```
 
 ### 4. 在 Agent 中使用
@@ -64,12 +70,17 @@ python .agents/db/analyze.py --advice
 在支持 OpenCode / Claude Code 等 AI 工具的项目中，加载 skill 即可获得基于你个人数据的智能分析：
 
 ```
-skill(name="/train")   # 训练分析 + 训练科学知识库
+skill(name="/train")   # 训练 API + 训练科学知识库
 skill(name="/body")    # 身体数据分析
 skill(name="/diet")    # 饮食数据分析
 ```
 
 Agent 会自动读取 `.agents/profile.md` 了解你的偏好和目标。
+
+Agent 的分析能力基于：
+- 本地 SQLite 数据 → 直接在库上做 SQL 查询推理
+- 知识库 → `knowledge/`（训练科学）
+- 用户画像 → `.agents/profile.md`
 
 ---
 
@@ -80,31 +91,33 @@ Agent 会自动读取 `.agents/profile.md` 了解你的偏好和目标。
 ├── profile.md                ← 你的个人档案（已 gitignore）
 ├── profile.example.md        ← 档案模板（可提交）
 ├── db/
-│   ├── sync_train.py         ← 训练数据同步脚本
-│   ├── analyze.py            ← 训练分析脚本
+│   ├── sync_train.py         ← 批量历史同步脚本
+│   ├── query_train.py        ← 按天查询（cache-through）
+│   ├── write_train.py        ← 写回训练（dry-run → confirmed）
+│   ├── analyze.py            ← [已废弃] 分析由 Agent 直接推理
 │   └── train.db              ← SQLite 数据库（已 gitignore）
-└── skills/
-    ├── _shared/
-    │   ├── auth.md                   ← 通用鉴权规则
-    │   ├── auth.body.md              ← 身体 Key（生成，已 gitignore）
-    │   ├── auth.diet.md              ← 饮食 Key（生成，已 gitignore）
-    │   ├── auth.train.md             ← 训练 Key（生成，已 gitignore）
-    │   ├── error-handling.md         ← 通用错误处理
-    │   └── generate_auth.py          ← Key 注入脚本
-    ├── body.md                ← 训记身体数据 API Skill
-    ├── diet.md                ← 训记饮食数据 API Skill
-    └── train.md               ← 训记训练数据 API Skill
-├── knowledge/
-│   ├── 00-快速导航.md             ← 知识库入口
-│   ├── 01-训练核心原则.md           ← 容量/强度/频率/渐进
-│   ├── 02-计划设计.md             ← 分化/周期化/PPL模板
-│   ├── 03-动作技术.md             ← 动作要点/替代方案
-│   ├── 04-恢复与伤病.md           ← 恢复评估/伤病预防
-│   ├── 05-营养与补剂.md           ← 饮食/补剂选择
-│   └── 99-来源文献.md             ← 来源链接（可追溯验证）
+├── skills/
+│   ├── _shared/
+│   │   ├── auth.md                   ← 通用鉴权规则
+│   │   ├── auth.body.md              ← 身体 Key（生成，已 gitignore）
+│   │   ├── auth.diet.md              ← 饮食 Key（生成，已 gitignore）
+│   │   ├── auth.train.md             ← 训练 Key（生成，已 gitignore）
+│   │   ├── error-handling.md         ← 通用错误处理
+│   │   └── generate_auth.py          ← Key 注入脚本
+│   ├── body.md                ← 训记身体数据 API Skill
+│   ├── diet.md                ← 训记饮食数据 API Skill
+│   └── train.md               ← 训记训练数据 API Skill
+└── workflows/
+    └── project-bootstrap.md
 
-.env                          ← API Key（已 gitignore）
-.env.example                  ← Key 模板
+knowledge/                    ← 训练科学知识库（项目内容）
+├── 00-快速导航.md
+├── 01-训练核心原则.md ~ 99-来源文献.md
+└── WORKFLOW.md
+
+tmp/                          ← 临时文件（已 gitignore）
+.env / .env.example
+index.html / _sidebar.md      ← GitHub Pages (Docsify)
 ```
 
 ---
@@ -112,17 +125,16 @@ Agent 会自动读取 `.agents/profile.md` 了解你的偏好和目标。
 ## 能力
 
 ### 当前已有
-- ✅ 从训记 API 增量同步训练记录到本地 SQLite
-- ✅ 推/拉/腿 训练量平衡分析
-- ✅ 主项（卧推、硬拉等）重量进展追踪
-- ✅ 平台期检测
-- ✅ 基于个人偏好的训练建议
+- ✅ `query_train.py` — cache-through 查询（本地→API→回写缓存，防缓存穿透）
+- ✅ `write_train.py` — 写回训练（dry-run 验证 → 确认写入 → 自动同步）
+- ✅ `sync_train.py` — 批量历史同步
+- ✅ Agent 直接在 SQLite 上推理分析（不依赖固定规则脚本）
 - ✅ 训练科学知识库（强度区间、RPE、渐进超载、Deload 等）
+- ✅ GitHub Pages + Docsify 移动端知识站
 
 ### 计划中
-- 📋 写回训练计划：根据分析和偏好生成下一次训练并写入训记
 - 🔗 体/训/食数据关联：身体数据 + 训练 + 饮食的交叉分析
-- 🧠 更智能的周期化建议
+- 🧠 更智能的 Agent 驱动周期化建议
 
 ---
 

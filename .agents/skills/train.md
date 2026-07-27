@@ -5,16 +5,55 @@ description: "训记训练数据 Open API —— 读取/写回训练记录、RPE
 # 训记训练数据 Open API Skill
 
 ## 原则
-- 只在用户明确要求读取、整理或写回训练数据时调用接口。
+- 本地数据优先：过去日期的查询走 `query_train.py`（cache-through），自动处理本地→API→回写缓存。
+- 本 Skill 仅定义 API 交互规则。CRUD 操作由以下 CLI 脚本封装（Agent 直接调用即可）：
+  - `python .agents/db/query_train.py --date YYYY-MM-DD` — 读（cache-through，防缓存穿透）
+  - `python .agents/db/write_train.py --dry-run < data.json` — 写前验证
+  - `python .agents/db/write_train.py --confirmed < data.json` — 确认写入 + 自动同步缓存
+  - `python .agents/db/sync_train.py --months N` — 批量历史同步
+- 分析是判断密集型工作，不由脚本硬编码。Agent 直接在本地 SQLite 上做查询推理：
+  - `sqlite3 .agents/db/train.db "SELECT ..."` 或
+  - 写临时 Python 脚本执行复杂查询
 - 写回前必须先展示变更摘要，并等待用户确认。
-- 按 `datestr` 缓存读取结果；同一天不要重复请求。
 
 @_shared/auth.md
 
 @_shared/auth.train.md
 
-> **训练知识库**: 另见 `.agents/knowledge/00-快速导航.md`（Agent 需用 Read 工具加载）
+> **训练知识库**: 另见 `knowledge/00-快速导航.md`（Agent 需用 Read 工具加载）
 > **用户画像**: 另见 `.agents/profile.md`（Agent 需用 Read 工具单独加载）
+
+## 本地数据库（SQLite）
+
+路径：`.agents/db/train.db`
+
+```sql
+-- 同步元数据（记录哪些日期已同步/标记为空）
+sync_meta(key TEXT PK, value TEXT)
+  -- key = "synced_{datestr}", value = "1"
+
+-- 训练主表
+trains(localid INTEGER PK, datestr TEXT, title TEXT,
+       start_ms INTEGER, end_ms INTEGER, duration_s INTEGER,
+       note TEXT)
+
+-- 动作
+movements(id INTEGER PK AUTO, train_id INTEGER → trains.localid,
+          name TEXT, idx INTEGER, difficulty TEXT)
+
+-- 组
+sets(id INTEGER PK AUTO, movement_id INTEGER → movements.id,
+     idx INTEGER, done INTEGER, weight_kg REAL, reps INTEGER,
+     rpe TEXT, time_s INTEGER, self_weight INTEGER)
+```
+
+Agent 执行分析时用 `sqlite3` 直接查询：
+
+```bash
+sqlite3 .agents/db/train.db "SELECT ..."
+```
+
+或编写临时 Python 脚本做复杂联结查询。
 
 ## 接口
 - 训练记录 Base URL: `https://trains.xunjiapp.cn`

@@ -79,7 +79,7 @@ Agent 使用知识库的流程：
 ## 三、文件结构
 
 ```
-.agents/knowledge/
+knowledge/
 ├── WORKFLOW.md          ← 本文档
 ├── _index.md            ← 目录 / 速查
 ├── sources.md           ← 来源清单（链接、可信等级）

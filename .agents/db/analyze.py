@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 """
-训记训练数据分析
-
-从本地 SQLite 读取训练数据，输出分析报告。
-用法:
-    python .agents/db/analyze.py                   # 完整报告
-    python .agents/db/analyze.py --movement "杠铃卧推"  # 单个动作进展
-"""
+[已废弃] 分析由 Agent 直接在 SQLite 上推理，不再使用固定规则脚本。
+保留仅作参考。请改用 query_train.py 查询 + Agent 分析。"""
 
 import argparse
 import sqlite3
