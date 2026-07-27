@@ -20,7 +20,7 @@ description: "训记训练数据 Open API —— 读取/写回训练记录、RPE
 
 @_shared/auth.train.md
 
-> **训练知识库**: 另见 `knowledge/00-快速导航.md`（Agent 需用 Read 工具加载）
+> **训练知识库**: 另见 `knowledge/快速导航.md`（Agent 需用 Read 工具加载）
 > **用户画像**: 另见 `.agents/profile.md`（Agent 需用 Read 工具单独加载）
 
 ## 本地数据库（SQLite）

@@ -17,7 +17,7 @@ cat > "$PROMPT_FILE" <<'PROMPT_EOF'
 
 ## 你的任务
 1. 读取 .agents/profile.md — 获取用户偏好、限制、当前阶段
-2. 读取 knowledge/02-计划设计.md — 获取动作模板
+2. 读取 knowledge/计划设计.md — 获取动作模板
 3. 根据计划（腿推拉PPL循环）和当前阶段，生成今日训练计划
 4. 用 discord_send_message 发送到 target='学习星球/健身打卡'
 

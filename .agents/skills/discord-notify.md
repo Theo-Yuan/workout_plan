@@ -16,7 +16,7 @@ description: "训记 Discord 通知 —— 训练预告 / 完成分享 / 分析�
 
 **触发**：用户说"今天练什么"、"训练预告"、"帮我发个预告"
 
-**数据来源**：读取 `query_train.py` 查最近训练确定分化周期 → 读取 `.agents/profile.md` 获取偏好 → 读取 `knowledge/02-计划设计.md` 获取动作模板
+**数据来源**：读取 `query_train.py` 查最近训练确定分化周期 → 读取 `.agents/profile.md` 获取偏好 → 读取 `knowledge/计划设计.md` 获取动作模板
 
 **消息格式**：
 
@@ -33,7 +33,7 @@ description: "训记 Discord 通知 —— 训练预告 / 完成分享 / 分析�
 ```
 
 **动作填充规则**：
-- 根据分化类型（推/拉/腿）从 `knowledge/02-计划设计.md` 的 PPL 模板选取
+- 根据分化类型（推/拉/腿）从 `knowledge/计划设计.md` 的 PPL 模板选取
 - 结合 `.agents/profile.md` 中的偏好和限制（如腿部打磨期不做杠铃深蹲）
 - 参考近期训练数据给出重量建议（基于上次同动作表现）
 

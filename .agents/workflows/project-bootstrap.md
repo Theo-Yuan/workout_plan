@@ -345,8 +345,8 @@ _inbox/  分类    来源     更新    按需
 ```markdown
 - [🏠 首页](README.md)
 - **知识库**
-  - [📖 快速导航](knowledge/00-快速导航.md)
-  - [📖 章节](knowledge/01-xxx.md)
+  - [📖 快速导航](knowledge/快速导航.md)
+  - [📖 章节](knowledge/xxx.md)
 ```
 
 ### 6.3 配置 GitHub Pages
