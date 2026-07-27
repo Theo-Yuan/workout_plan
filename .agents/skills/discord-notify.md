@@ -118,3 +118,53 @@ discord_send_message(
 |--------|------|------|
 | 学习星球 | #健身打卡 | 训练分享主频道 |
 | 学习星球 | #✅学习打卡 | 学习打卡（非训练） |
+
+---
+
+## 脚本工具
+
+项目内置了可直接调度或手动调用的脚本：
+
+### workout_summary.sh / workout_summary.py
+
+训练完成后，生成摘要并发送到 Discord。
+
+```bash
+# 生成今日训练摘要并发送到 Discord
+./.agents/sched/workout_summary.sh
+python3 .agents/sched/workout_summary.py
+```
+
+**数据来源**：`query_train.py --date {today} --json`
+
+**自动识别分化类型**：从训练标题提取「推/拉/腿」。
+
+### send_discord.py
+
+底层发送工具，支持命令行调用。
+
+```bash
+echo "消息内容" | python3 .agents/sched/send_discord.py "学习星球/健身打卡"
+```
+
+**Token 来源**：macOS Keychain（`discord-bot-token` / `opencode`）
+
+### workout_preview.sh
+
+训练预告脚本（已有）。生成当日训练计划并发送到 Discord。
+
+```bash
+./.agents/sched/workout_preview.sh
+```
+
+### 调度建议
+
+可将脚本加入 crontab 实现自动化：
+
+```bash
+# 每天早上 7:00 发送训练预告
+0 7 * * * /path/to/.agents/sched/workout_preview.sh
+
+# 每天晚上 22:00 检查并发送训练总结
+0 22 * * * /path/to/.agents/sched/workout_summary.sh
+``` |
