@@ -169,10 +169,28 @@ def write_trains(api_key: str, data: dict, confirmed: bool = False) -> dict:
     if result is None:
         return {"status": "error", "message": "API request failed"}
 
-    if result.get("__rate_limited__"):
-        return {"status": "rate_limited", "retry_after_ms": result["retry_after_ms"]}
+    # 限频检测：__rate_limited__ 或 success:false + error 含 too frequent
+    is_rate_limited = (
+        result.get("__rate_limited__")
+        or (result.get("success") is False and "too frequent" in (result.get("error") or "").lower())
+    )
+    if is_rate_limited:
+        retry_ms = result.get("retry_after_ms", 45000)
+        # 从 error 消息提取秒数
+        if not result.get("retry_after_ms") and "retry after" in (result.get("error") or ""):
+            import re
+            m = re.search(r'(\d+)s', result["error"])
+            if m:
+                retry_ms = int(m.group(1)) * 1000
+        return {"status": "rate_limited", "retry_after_ms": retry_ms}
 
-    if confirmed and result.get("success"):
+    # 成功检测：success=true 或 res.trains 有数据（API 可能不返回 success 字段）
+    is_success = (
+        result.get("success") is True
+        or (isinstance(result.get("res"), dict) and result["res"].get("trains"))
+    )
+
+    if confirmed and is_success:
         print(f"✓ 写回成功，同步 {len(datestrs)} 天到本地缓存...")
         _sync_written_dates(api_key, datestrs)
 
@@ -239,13 +257,21 @@ def main():
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
-        if result.get("success"):
-            print("✓ 写回成功")
-        elif result.get("status") == "rate_limited":
+        if result.get("status") == "rate_limited":
             retry = result["retry_after_ms"] / 1000
             print(f"⏳ 限频，请等 {retry:.0f}s 后重试")
+        elif result.get("status") == "error":
+            print(f"✗ 写回失败: {result['message']}")
         else:
-            print(f"✗ 写回失败: {result}")
+            # 成功响应可能无 success 字段，有 res.trains 即视为成功
+            is_success = (
+                result.get("success") is True
+                or (isinstance(result.get("res"), dict) and result["res"].get("trains"))
+            )
+            if is_success:
+                print("✓ 写回成功")
+            else:
+                print(f"✗ 写回失败: {result}")
 
 
 if __name__ == "__main__":

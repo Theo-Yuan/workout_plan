@@ -89,7 +89,11 @@ Content-Type: application/json
 - 动作不会暴露内部 key；需要标准动作名时读取 GitHub 动作名表。
 
 ## 读取官方计划
-- 官方计划读取包括用户正在使用的 PlatformPlan 和 UniversalPlan，仅支持读取。接口使用本 Skill 中同一个训练数据 Key；调用前用户必须先在 App 申请 Key。
+- ⛔ **官方计划仅支持读取，不支持修改/写入。** 接口使用本 Skill 中同一个训练数据 Key；调用前用户必须先在 App 申请 Key。
+- ⛔ **如果用户请求编辑计划（修改动作、更换组次、增删休息日等），应明确告知此限制：**
+  > 训记 Open API 不支持修改计划。计划编辑需在训记 App 中手动操作。
+  >
+  > 替代能力：可提供计划分析建议（容量评估、动作合理性、渐进策略等），或写回训练历史记录作为实际完成数据。
 - 接口返回 gzip 压缩 JSON（`Content-Encoding: gzip`）。大多数 HTTP 客户端会自动解压；不会自动解压时，先解 gzip 再解析 JSON。
 - 先列出计划，再使用返回的 `plan_ref` 查询日期范围。`platform:155` 和 `universal:155` 表示两个不同的计划实例。
 ```http
@@ -197,7 +201,10 @@ Content-Type: application/json
 - 更新旧训练时保留 `localid`、`start`、`end`，除非用户明确要改时间。
 - 组至少包含 `weight`/`weight_kg`、`reps`、`time`/`duration_s`、`selfWeight` 之一。
 - 未完成组用 `done: false`；不要把完整模式读到的未完成组擅自删掉。
+- **写回时 `done: false` 的组会被 API 丢弃**——写回仅保留已打勾（`done: true`）的组。如需预创建未来训练模板，每个动作至少保留 1 组 `done: true` 作为占位。
 - 写回成功后，用服务端返回的标准化 `res` 覆盖缓存。
+- **成功响应可能无 `success` 字段**——API 有时只返回 `res.trains` 数据而无顶层 `success`。判断写回成功应检查 `res.trains` 是否存在数据，而非仅依赖 `success` 字段。
+- **限频响应有两种格式**——`{"__rate_limited__": true}` 或 `{"success": false, "error": "too frequent, retry after 32s"}`，两种都需要处理。
 
 ## 限频与错误
 

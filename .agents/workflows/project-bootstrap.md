@@ -31,7 +31,7 @@ updated: 2026-07-26
 └── workflows/            ← 可复用工作流
     └── project-bootstrap.md  ← 本文档
 
-knowledge/                ← 项目知识库（根目录，项目内容）
+knowledge/              ← 项目知识库（根目录，项目内容）
 ├── 00-快速导航.md         ←   人类入口 + Agent 索引
 ├── 01-主题.md             ←   每章一个文件，frontmatter + 叙述体
 ├── 99-来源文献.md         ←   所有来源链接
