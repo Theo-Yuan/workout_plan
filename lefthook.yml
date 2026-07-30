@@ -1,0 +1,8 @@
+pre-commit:
+  parallel: true
+  commands:
+    sidebar-links:
+      run: .agents/tools/check-sidebar-links.sh
+      skip:
+        - merge
+        - rebase
