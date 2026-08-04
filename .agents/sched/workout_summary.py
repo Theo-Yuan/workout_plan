@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 from datetime import date
+from pathlib import Path
 
 DISCORD_PYTHON = "/Users/theoyuan/.local/share/discord-mcp/venv/bin/python"
 
@@ -125,7 +126,93 @@ def send_discord(message: str, target: str = TARGET):
     return result.returncode == 0
 
 
+def _recent_same_type(title: str, limit: int = 3):
+    """直接从本地 SQLite 查询最近 N 次同类分化训练（供对比）。"""
+    import sqlite3
+    day_type = None
+    for t in ("腿", "推", "拉"):
+        if t in title:
+            day_type = t
+            break
+    if not day_type:
+        return []
+
+    db_path = Path(__file__).resolve().parent.parent / "db" / "train.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """SELECT t.localid, t.datestr, t.title, t.duration_s
+           FROM trains t
+           WHERE t.title LIKE ? AND t.duration_s > 0
+           ORDER BY t.datestr DESC LIMIT ?""",
+        (f"%{day_type}%", limit),
+    ).fetchall()
+    out = []
+    for r in rows:
+        movements = conn.execute(
+            """SELECT m.name, COUNT(s.id) AS sets
+               FROM movements m LEFT JOIN sets s ON s.movement_id = m.id
+               WHERE m.train_id = ?
+               GROUP BY m.id""",
+            (r["localid"],),
+        ).fetchall()
+        out.append({
+            "datestr": r["datestr"],
+            "title": r["title"],
+            "duration_min": (r["duration_s"] or 0) // 60,
+            "movements": [
+                {"name": m["name"], "sets": m["sets"]} for m in movements
+            ],
+        })
+    conn.close()
+    return out
+
+
+def _summary_data():
+    """Agent 决策数据：今日训练 + 最近同类对比 + profile，供 agent 生成个性化摘要。"""
+    data = query_date(TODAY)
+    if not data:
+        return {"date": TODAY, "error": "今日无训练数据"}
+
+    trains = data[0]["trains"]
+    if not trains:
+        return {"date": TODAY, "error": "今日无训练数据"}
+    train = pick_train(trains)
+    title = train.get("title", "")
+    movements = train.get("movements", [])
+    duration_min = (train.get("duration_s") or 0) // 60 if train.get("duration_s") else 0
+
+    profile_text = ""
+    profile_path = Path(__file__).resolve().parent.parent / "profile.md"
+    if profile_path.exists():
+        profile_text = profile_path.read_text()
+
+    return {
+        "date": TODAY,
+        "title": title,
+        "duration_min": duration_min,
+        "movements": [
+            {
+                "name": m.get("name"),
+                "sets": [
+                    {"weight": s.get("weight_kg"), "reps": s.get("reps"),
+                     "done": s.get("done")}
+                    for s in m.get("sets", [])
+                ],
+            }
+            for m in movements
+        ],
+        "recent_same_type": _recent_same_type(title),
+        "profile": profile_text,
+    }
+
+
 def main():
+    if "--data" in sys.argv:
+        import json as _json
+        print(_json.dumps(_summary_data(), ensure_ascii=False))
+        return
+
     data = query_date(TODAY)
     if not data:
         print(f"No training data for {TODAY}")

@@ -12,7 +12,7 @@ import sqlite3
 import subprocess
 import sys
 import urllib.request
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -123,18 +123,18 @@ def _detect_phase(title):
     return None
 
 
-def _determine_today(last_date_str, last_phase):
+def _determine_today(last_phase):
+    """确定今天应训练的阶段。
+
+    阶段按「训练次数」推进（每次训练推进一个 PPL 阶段：推→拉→腿），
+    而非按经过的天数推进。这样休息日不会导致阶段错位。
+    例如上次练「腿」，下次训练即为「推」，与中间休息几天无关。
+    """
     if last_phase not in PPL_CYCLE:
         return PPL_CYCLE[0]
 
-    last_dt = datetime.strptime(last_date_str, "%Y-%m-%d").date()
-    today = date.today()
-    days_since = (today - last_dt).days
-    if days_since < 0:
-        return PPL_CYCLE[0]
-
     idx = PPL_CYCLE.index(last_phase)
-    return PPL_CYCLE[(idx + days_since) % 3]
+    return PPL_CYCLE[(idx + 1) % 3]
 
 
 def _is_deload(profile_text):
@@ -199,6 +199,66 @@ def generate_message(phase, is_deload, db_path):
     ])
 
 
+def _query_plan_today():
+    """调用 query_plan.py 读取官方计划（今天前7天~后30天，含动作）。
+
+    官方计划是「日期→训练日/休息日」的真实映射。注意：计划 ≠ 实际执行，
+    用户可能休息/加练/调整。返回解析后的 days 列表。
+    """
+    script = PROJECT_ROOT / ".agents" / "db" / "query_plan.py"
+    result = subprocess.run(
+        ["python3", str(script), "--today"],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0:
+        return []
+    lines = [l for l in result.stdout.strip().splitlines() if l.strip()]
+    days = []
+    for line in lines:
+        try:
+            days.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return days
+
+
+def _recent_trainings(db_path, limit=8):
+    """读取最近 N 次实际训练记录（datestr + title + 时长），供 agent 判断实际进度。"""
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """SELECT datestr, title, duration_s
+           FROM trains
+           WHERE duration_s IS NOT NULL AND duration_s > 0
+           ORDER BY datestr DESC LIMIT ?""",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [
+        {"datestr": r["datestr"], "title": r["title"],
+         "duration_min": r["duration_s"] // 60 if r["duration_s"] else 0}
+        for r in rows
+    ]
+
+
+def _plan_payload():
+    """Agent 决策数据：官方计划 + 最近实际训练 + profile 摘要，不硬编码阶段。"""
+    profile_text = ""
+    if PROFILE_PATH.exists():
+        profile_text = PROFILE_PATH.read_text()
+
+    today = date.today()
+    return {
+        "date": today.strftime("%Y-%m-%d"),
+        "weekday": WEEKDAY_CN[today.weekday()],
+        "official_plan": _query_plan_today(),
+        "recent_trainings": _recent_trainings(DB_PATH),
+        "profile": profile_text,
+        "note": "阶段判断请以最近实际训练进度为准（推→拉→腿循环），官方计划仅作参考。"
+                "用户实际可能休息/加练/调整，不要假设严格按计划执行。",
+    }
+
+
 def _get_payload():
     profile_text = ""
     if PROFILE_PATH.exists():
@@ -215,7 +275,7 @@ def _get_payload():
               file=sys.stderr)
         sys.exit(1)
 
-    today_phase = _determine_today(last_date, last_phase)
+    today_phase = _determine_today(last_phase)
     is_deload = _is_deload(profile_text)
 
     exercises = []
@@ -245,8 +305,13 @@ def _get_payload():
 
 
 def main():
+    plan_mode = "--plan" in sys.argv
     json_mode = "--json" in sys.argv
     dry_run = "--dry-run" in sys.argv
+
+    if plan_mode:
+        print(json.dumps(_plan_payload(), ensure_ascii=False))
+        return
 
     payload = _get_payload()
 

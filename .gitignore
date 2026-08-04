@@ -6,6 +6,12 @@
 
 # 本地训练数据库
 .agents/db/train.db
+.agents/db/train.db.bak_*
+.agents/db/plan_cache.json
+
+# Python 缓存
+__pycache__/
+*.pyc
 
 # 个人训练档案（含身体数据、训练偏好）
 .agents/profile.md
