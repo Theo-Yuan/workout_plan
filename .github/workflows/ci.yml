@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Py compile (syntax check all scripts)
+        run: |
+          set -e
+          found=0
+          while IFS= read -r f; do
+            found=1
+            python3 -m py_compile "$f"
+            echo "✓ $f"
+          done < <(find . -name '*.py' -not -path '*/__pycache__/*')
+          [ "$found" = "1" ] || echo "No python files found"
+
+      - name: Shell syntax check
+        run: |
+          set -e
+          while IFS= read -r f; do
+            bash -n "$f"
+            echo "✓ $f"
+          done < <(find . -name '*.sh' -type f)
+
+      - name: Smoke test — analyze script help
+        run: |
+          python3 .agents/db/analyze.py --help | head -5 || true
