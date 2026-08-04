@@ -23,7 +23,9 @@ def query_date(date_str: str) -> list:
     return json.loads(result.stdout)
 
 
-def pick_train(trains: list) -> dict:
+def pick_train(trains: list) -> dict | None:
+    if not trains:
+        return None
     for t in trains:
         if t.get("duration_s", 0) > 0:
             return t
@@ -38,9 +40,13 @@ def is_warmup(weight, max_weight):
     return weight < max_weight
 
 
-def generate_summary(data: list) -> str:
+def generate_summary(data: list) -> str | None:
     trains = data[0]["trains"]
+    if not trains:
+        return None
     train = pick_train(trains)
+    if not train:
+        return None
     title = train["title"]
     movements = train["movements"]
 
@@ -178,6 +184,8 @@ def _summary_data():
     if not trains:
         return {"date": TODAY, "error": "今日无训练数据"}
     train = pick_train(trains)
+    if not train:
+        return {"date": TODAY, "error": "今日无训练数据"}
     title = train.get("title", "")
     movements = train.get("movements", [])
     duration_min = (train.get("duration_s") or 0) // 60 if train.get("duration_s") else 0
@@ -219,6 +227,9 @@ def main():
         return
 
     summary = generate_summary(data)
+    if not summary:
+        print(f"No training data for {TODAY}")
+        return
     print(summary)
     print()
 
