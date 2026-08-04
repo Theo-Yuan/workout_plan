@@ -14,11 +14,13 @@
     python .agents/db/query_plan.py --today            # 今天前7天 ~ 后30天（含动作）
     python .agents/db/query_plan.py --today --no-movements   # 仅日历，不含动作
     python .agents/db/query_plan.py --today --refresh  # 强制刷新缓存
+    python .agents/db/query_plan.py --gaps             # 对照实际训练，找出漏练的训练日
 """
 
 import argparse
 import gzip
 import json
+import sqlite3
 import sys
 import urllib.error
 import urllib.request
@@ -30,6 +32,7 @@ PROJECT_ROOT = DB_DIR.parents[1]
 ENV_FILE = PROJECT_ROOT / ".env"
 API_URL = "https://api.xunjiapp.cn/open/plan/query_gzip"
 CACHE_FILE = DB_DIR / "plan_cache.json"
+TRAIN_DB_PATH = DB_DIR / "train.db"
 
 
 def load_api_key() -> str:
@@ -149,6 +152,44 @@ def list_plans(key: str):
         }, ensure_ascii=False))
 
 
+def find_missed_sessions(days: list, train_db_path: Path = TRAIN_DB_PATH) -> list:
+    """对照官方计划与实际训练，找出「计划安排了训练日但实际未执行」的漏练。
+
+    判断规则：计划 day_type=training 且 datestr 为过去日期，但本地 SQLite
+    train.db 中该日期没有任何训练记录 → 记为漏练。
+
+    注意：本地库若未同步过当天（sync_meta 无 synced_ 标记）则跳过，避免误报。
+    """
+    if not train_db_path.exists():
+        return []
+    today = date.today().isoformat()
+    conn = sqlite3.connect(str(train_db_path))
+    missed = []
+    try:
+        for d in days:
+            ds = d.get("datestr")
+            if not ds or ds >= today:
+                continue
+            if d.get("day_type") != "training":
+                continue
+            synced = conn.execute(
+                "SELECT 1 FROM sync_meta WHERE key = ?", (f"synced_{ds}",)
+            ).fetchone()
+            if not synced:
+                continue
+            has_train = conn.execute(
+                "SELECT 1 FROM trains WHERE datestr = ? LIMIT 1", (ds,)
+            ).fetchone()
+            if not has_train:
+                missed.append({
+                    "datestr": ds,
+                    "workout_name": (d.get("workout") or {}).get("name"),
+                })
+    finally:
+        conn.close()
+    return missed
+
+
 def _print_days(days: list, movements: bool):
     for d in days:
         row = {
@@ -176,9 +217,24 @@ def main():
     parser.add_argument("--end", help="结束日期 YYYY-MM-DD")
     parser.add_argument("--no-movements", action="store_true", help="不含动作，仅日历")
     parser.add_argument("--refresh", action="store_true", help="强制刷新缓存")
+    parser.add_argument("--gaps", action="store_true",
+                        help="对照实际训练，找出计划安排了但未执行的训练日（漏练检测）")
     args = parser.parse_args()
 
     key = load_api_key()
+
+    if args.gaps:
+        today = date.today()
+        start = (today - timedelta(days=7)).isoformat()
+        end = today.isoformat()
+        days = get_plan_cached(key, args.ref, start, end, False, refresh=args.refresh)
+        missed = find_missed_sessions(days)
+        if not missed:
+            print("(无漏练训练日)")
+        else:
+            for m in missed:
+                print(json.dumps(m, ensure_ascii=False))
+        return
 
     if args.list:
         list_plans(key)

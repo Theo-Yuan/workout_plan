@@ -18,12 +18,17 @@ description: "训记 Discord 通知 —— 训练预告 / 完成分享 / 分析�
 
 **数据来源**：Agent 主导判断，脚本只提供原始数据：
 - `query_plan.py --today` → 官方计划（日期→训练日/休息日真实映射）
+- `query_plan.py --gaps` → **漏练检测**（官方计划安排了训练日但实际未执行的清单）
 - `query_train.py` / SQLite → 最近实际训练记录（判断实际进度）
 - `.agents/profile.md` → 偏好、限制、当前阶段（减载周等）
 
 **架构原则**：**阶段判断以实际训练进度为准**（推→拉→腿循环），官方计划仅作参考。
 用户实际可能休息/加练/调整，不要假设严格按计划执行。`workout_preview.sh` 会先
 调用 `workout_preview.py --plan` 收集数据，再交给 opencode agent 自主判断并生成消息。
+
+**漏练处理**：若 `--gaps` 检出漏练的训练日，应**优先建议补练**（把漏练的分化类型
+补到今天/最近可练日），而不是直接按原计划推进。`workout_preview.py --plan` 的输出
+中 `missed_sessions` 字段即为此清单。
 
 **消息格式**：
 
@@ -185,9 +190,13 @@ python3 .agents/db/query_plan.py --today
 python3 .agents/db/query_plan.py --today --no-movements
 # 强制刷新缓存
 python3 .agents/db/query_plan.py --today --refresh
+# 漏练检测：官方计划安排了训练日但实际未执行的清单
+python3 .agents/db/query_plan.py --gaps
 # 自定义日期范围
 python3 .agents/db/query_plan.py --get --ref platform:70 --start 2026-08-01 --end 2026-08-10
 ```
 
 > ⚠️ 官方计划仅支持读取，不支持修改。计划编辑需在训记 App 手动操作。
-> 计划 ≠ 实际执行：用户可能休息/加练/调整，预告以实际训练进度为准。 |
+> 计划 ≠ 实际执行：用户可能休息/加练/调整，预告以实际训练进度为准。
+> `--gaps` 基于本地 SQLite 判定漏练（计划训练日但当天无训练记录），
+> 需确保本地数据已同步（`sync_train.py` 或当日已缓存）。 |

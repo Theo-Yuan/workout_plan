@@ -36,6 +36,18 @@ for r in data['recent_trainings']:
     print(f\"  {r['datestr']}  {r['title']}  {r['duration_min']}min\")
 ")
 
+# 提取漏练检测（计划安排了但实际未执行的训练日）
+MISSED_LINES=$(printf '%s' "$PLAN_JSON" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+missed = data.get('missed_sessions', [])
+if not missed:
+    print('  （无漏练）')
+for m in missed:
+    name = m.get('workout_name') or '-'
+    print(f\"  {m['datestr']}  未执行  {name}\")
+")
+
 PROMPT_FILE=$(mktemp /tmp/workout-prompt-$$-XXXXXX.txt)
 trap "rm -f $PROMPT_FILE" EXIT
 
@@ -51,9 +63,14 @@ PLAN_PLACEHOLDER
 ## 最近实际训练记录（实际执行的训练，判断进度的依据）
 RECENT_PLACEHOLDER
 
+## 漏练检测（官方计划安排了训练日，但实际未执行的）
+MISSED_PLACEHOLDER
+
 ## 你的任务
 1. 读取 .agents/profile.md 了解用户偏好、限制、当前阶段（减载周等）
 2. 综合判断今天该预告什么训练：
+   - **先处理漏练**：若 missed_sessions 存在漏练的训练日，应优先考虑补练
+     （把漏练的分化类型补到今天/最近可练日），而不是直接按原计划推进
    - **以最近实际训练进度为准**：看最近一次实际训练是什么阶段（推/拉/腿），按 PPL 循环（推→拉→腿）取下一个作为今天阶段
    - 官方计划仅作参考：若官方计划今天标注了训练日，可作为交叉验证；但用户实际可能休息/加练/调整，不要假设严格按计划执行
    - 结合 profile 的偏好（如腿部打磨期小重量）、减载周状态、身体疲劳等
@@ -90,13 +107,15 @@ sed -i '' \
     -e "s/WEEKDAY_PLACEHOLDER/$WEEKDAY/g" \
     "$PROMPT_FILE"
 
-# 替换 PLAN_PLACEHOLDER 和 RECENT_PLACEHOLDER（多行）
+# 替换 PLAN/RECENT/MISSED 占位符（多行）
 TMP_PROMPT2=$(mktemp /tmp/workout-prompt2-$$-XXXXXX.txt)
 while IFS= read -r line; do
     if [[ "$line" == "PLAN_PLACEHOLDER" ]]; then
         echo "$PLAN_LINES" >> "$TMP_PROMPT2"
     elif [[ "$line" == "RECENT_PLACEHOLDER" ]]; then
         echo "$RECENT_LINES" >> "$TMP_PROMPT2"
+    elif [[ "$line" == "MISSED_PLACEHOLDER" ]]; then
+        echo "$MISSED_LINES" >> "$TMP_PROMPT2"
     else
         echo "$line" >> "$TMP_PROMPT2"
     fi

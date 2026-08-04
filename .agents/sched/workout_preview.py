@@ -222,6 +222,30 @@ def _query_plan_today():
     return days
 
 
+def _query_missed_sessions():
+    """调用 query_plan.py --gaps 找出漏练的训练日（计划安排了但实际未执行）。
+
+    数据来自：官方计划（过去 7 天的训练日）对照本地 SQLite 实际训练记录。
+    返回 [{datestr, workout_name}, ...]。
+    """
+    script = PROJECT_ROOT / ".agents" / "db" / "query_plan.py"
+    result = subprocess.run(
+        ["python3", str(script), "--gaps"],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0:
+        return []
+    missed = []
+    for line in result.stdout.strip().splitlines():
+        if not line.strip() or line.strip().startswith("("):
+            continue
+        try:
+            missed.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return missed
+
+
 def _recent_trainings(db_path, limit=8):
     """读取最近 N 次实际训练记录（datestr + title + 时长），供 agent 判断实际进度。"""
     conn = sqlite3.connect(str(db_path))
@@ -242,7 +266,7 @@ def _recent_trainings(db_path, limit=8):
 
 
 def _plan_payload():
-    """Agent 决策数据：官方计划 + 最近实际训练 + profile 摘要，不硬编码阶段。"""
+    """Agent 决策数据：官方计划 + 漏练检测 + 最近实际训练 + profile 摘要，不硬编码阶段。"""
     profile_text = ""
     if PROFILE_PATH.exists():
         profile_text = PROFILE_PATH.read_text()
@@ -252,10 +276,13 @@ def _plan_payload():
         "date": today.strftime("%Y-%m-%d"),
         "weekday": WEEKDAY_CN[today.weekday()],
         "official_plan": _query_plan_today(),
+        "missed_sessions": _query_missed_sessions(),
         "recent_trainings": _recent_trainings(DB_PATH),
         "profile": profile_text,
         "note": "阶段判断请以最近实际训练进度为准（推→拉→腿循环），官方计划仅作参考。"
-                "用户实际可能休息/加练/调整，不要假设严格按计划执行。",
+                "用户实际可能休息/加练/调整，不要假设严格按计划执行。"
+                "missed_sessions 是「官方计划安排了训练日但实际未执行」的漏练清单，"
+                "若存在漏练，应优先建议补练，而不是直接按原计划推进。",
     }
 
 
